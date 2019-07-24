@@ -1,0 +1,13 @@
+1 2 3 4 5
+6 7 8 9 1
+a b c d e
+ab cd ef gh 
+1 
+1 0.5 1
+sdf 3123 sdf sd1 3242
+34. sfsf 34234
+1e-6 445345345e-8 dfad 1.5 1e5
+
+asdfs
+    
+sdfsdf

@@ -1,0 +1,178 @@
+#!/usr/bin/env python3
+
+import sys
+import argparse
+import inspect
+import copy
+import code
+import matplotlib.pyplot as plt
+import numpy             as np
+
+# ===============================================
+# Helper Functions
+# ===============================================
+
+def slist(l, sep=' '):
+	"""convert a list into a string, with the given separator"""
+	return sep.join([str(i) for i in l])
+
+def sl(l, s=' '):
+	"""shorthand for slist"""
+	return slist(l, sep=s)
+
+def p(*args, **kwargs):
+	"""shorthand for Python builtin print"""
+	print(*args, **kwargs)
+
+def __int(i):
+	"""True if the given item can be converted to an integer"""
+	try:
+		a = int(i)
+		return True
+	except:
+		return False
+
+def __float(i):
+	"""True if the given item can be converted to a float"""
+	try:
+		a = float(i)
+		return True
+	except:
+		return False
+
+def npa(_list):
+	"""Shorthand for np.array(_list)"""
+	return np.array(_list)
+
+# ===============================================
+# END Helper Functions
+# ===============================================
+
+def get_args():
+	parser = argparse.ArgumentParser(
+		description='python-awk, basically awk, but using a python interpreter.'
+	)
+
+	parser.add_argument(
+		'-b', '--begin', dest='begin_statement', 
+		type=str, required=False, default='',
+		help='Execute this before anything else.'
+	)
+
+	parser.add_argument(
+		'-i', '--iter', dest='iteration_statement', 
+		type=str, required=False, default='',
+		help='Execute this for each line.'
+	)
+
+	parser.add_argument(
+		'-e', '--end', dest='end_statement', 
+		type=str, required=False, default='',
+		help='Execute this after everything else.'
+	)
+
+	parser.add_argument(
+		'-l', '--list-functions', dest='list_functions', 
+		action='store_true', 
+		help='List all helper functions and their doc strings.'
+	)
+
+	parser.add_argument(
+		'-s', '--cell-separator', dest='cell_separator', 
+		type=str, required=False, default=' ',
+		help='Split each line on this character.'
+	)
+
+	parser.add_argument(
+		'-r', '--record-separator', dest='record_separator', 
+		type=str, required=False, default='\n',
+		help='Consider each \"line\" to be separated by this.'
+	)
+
+	parser.add_argument(
+		dest='input_file', 
+		type=str, default='', nargs='?',
+		help='The file to read.'
+	)
+
+	return parser.parse_args()
+
+
+# This function converts curly brace syntax into proper Python syntax. 
+# It also converts ';' into newlines.
+# This is pretty much necessary if you want to write one-liners.
+def convert_to_python(text):
+	result   = ""
+	escaping = False
+	tab      = 0 
+
+	for c in text:
+		if c == '\\':
+			escaping = not escaping
+		if escaping:
+			escaping = False
+
+		if escaping:
+			result += '\\'
+		else:
+			if c == '{':
+				tab    += 1
+				result += ':\n' + ' '*(4 * tab)
+			elif c == '}':
+				tab -= 1
+				result += '\n' + ' '*(4 * tab)
+			elif c == ';':
+				result += '\n' + ' '*(4 * tab)
+			else:
+				result += c
+
+	return result
+
+if __name__ == '__main__':
+	args = get_args()
+
+	# Print all of the helper functions, if any.
+	if args.list_functions:
+		loc = copy.copy(locals())
+		for k in loc:
+			if isinstance(k, str):
+				item = loc[k]
+				if item is not None:
+					if callable(item):
+						doc = item.__doc__
+						if doc is not None:
+							print('def %s%s:'%(k, str(inspect.signature(item))))
+							print('%s"""%s"""\n'%(' '*4, doc))
+
+	# Figure out where to load input from.
+	if args.input_file != '':
+		with open(args.input_file, 'r') as file:
+			text = file.read()
+	else:
+		if not sys.stdin.isatty():
+			text = sys.stdin.read()
+		else:
+			print("No input, exiting . . . ")
+			exit()
+
+	args.begin_statement     = convert_to_python(args.begin_statement)
+	args.iteration_statement = convert_to_python(args.iteration_statement)
+	args.end_statement       = convert_to_python(args.end_statement)
+
+	lines   = text.split(args.record_separator)
+	n_lines = len(lines)
+
+	if args.begin_statement != '':
+		exec(args.begin_statement)
+
+	if args.iteration_statement != '':
+		for ln, line in enumerate(lines):
+			cells   = [i for i in line.split(args.cell_separator) if i != '']
+			c       = cells
+			n_cells = len(cells)
+			n_c     = n_cells
+			ln      = ln + 1
+			exec(args.iteration_statement)
+
+	if args.end_statement != '':
+		exec(args.end_statement)
