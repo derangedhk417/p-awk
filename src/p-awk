@@ -102,9 +102,10 @@ def get_args():
 # It also converts ';' into newlines.
 # This is pretty much necessary if you want to write one-liners.
 def convert_to_python(text):
-	result   = ""
-	escaping = False
-	tab      = 0 
+	result      = ""
+	escaping    = False
+	tab         = 0 
+	after_curly = False
 
 	for c in text:
 		if c == '\\':
@@ -115,10 +116,19 @@ def convert_to_python(text):
 		if escaping:
 			result += '\\'
 		else:
+			# Space after a closing curly bracket screws up the indent.
+			# Don't put it in the final string.
+			if after_curly:
+				if not c.isspace():
+					after_curly = False
+				else:
+					continue
+
 			if c == '{':
 				tab    += 1
 				result += ':\n' + ' '*(4 * tab)
 			elif c == '}':
+				after_curly = True
 				tab -= 1
 				result += '\n' + ' '*(4 * tab)
 			elif c == ';':
